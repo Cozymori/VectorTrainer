@@ -15,9 +15,13 @@ authors = [
 dependencies = [
     "openai>=1.0.0",
     "numpy>=1.24.0",
+    "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
+web = [
+    "streamlit>=1.30.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-mock>=3.10.0",
