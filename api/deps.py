@@ -30,35 +30,60 @@ ALL_FUNCTION_NAMES: List[str] = [
     "translate_review",
 ]
 
-FEEDBACK_PAIRS: List[FeedbackPair] = [
-    FeedbackPair(
-        input_prompt="이 제품의 리뷰를 요약해주세요",
-        bad_output="좋은 제품입니다",
-        fixed_output=(
+feedback_pairs_store: List[Dict[str, Any]] = [
+    {
+        "id": "fp-001",
+        "input_prompt": "이 제품의 리뷰를 요약해주세요",
+        "bad_output": "좋은 제품입니다",
+        "fixed_output": (
             "이 제품은 품질이 우수하며, 특히 내구성과 디자인 면에서 높은 평가를 받고 있습니다. "
             "배송 속도도 빠릅니다."
         ),
-        context={"function": "generate_review_summary"},
-    ),
-    FeedbackPair(
-        input_prompt="사용자 리뷰를 분석해주세요",
-        bad_output="별로입니다",
-        fixed_output=(
+        "context": {"function": "generate_review_summary"},
+    },
+    {
+        "id": "fp-002",
+        "input_prompt": "사용자 리뷰를 분석해주세요",
+        "bad_output": "별로입니다",
+        "fixed_output": (
             "사용자 리뷰 분석 결과: 긍정 요소(디자인, 가격)와 개선 필요 요소(AS, 설명서)가 "
             "혼재합니다. 전반적 만족도: 3.8/5."
         ),
-        context={"function": "generate_review_summary"},
-    ),
-    FeedbackPair(
-        input_prompt="이 리뷰의 핵심 포인트를 정리해주세요",
-        bad_output="핵심 포인트: 좋음",
-        fixed_output=(
+        "context": {"function": "generate_review_summary"},
+    },
+    {
+        "id": "fp-003",
+        "input_prompt": "이 리뷰의 핵심 포인트를 정리해주세요",
+        "bad_output": "핵심 포인트: 좋음",
+        "fixed_output": (
             "핵심 포인트: 1) 가격 대비 성능이 우수 2) 배터리 수명이 경쟁 제품 대비 "
             "30% 향상 3) A/S 대응 속도 개선 필요"
         ),
-        context={"function": "generate_review_summary"},
-    ),
+        "context": {"function": "generate_review_summary"},
+    },
 ]
+_next_fp_id: int = 4
+
+
+def generate_fp_id() -> str:
+    """Generate the next feedback-pair ID."""
+    global _next_fp_id
+    fp_id = f"fp-{_next_fp_id:03d}"
+    _next_fp_id += 1
+    return fp_id
+
+
+def get_feedback_pairs_as_dataclass() -> List[FeedbackPair]:
+    """Return FeedbackPair dataclass instances for pipeline execution."""
+    return [
+        FeedbackPair(
+            input_prompt=item["input_prompt"],
+            bad_output=item["bad_output"],
+            fixed_output=item["fixed_output"],
+            context=item.get("context", {}),
+        )
+        for item in feedback_pairs_store
+    ]
 
 # ---------------------------------------------------------------------------
 # Mock DatasetManager factory

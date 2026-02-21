@@ -74,6 +74,14 @@ export interface CostEstimateResponse {
   n_epochs: number;
 }
 
+export interface FeedbackPair {
+  id: string;
+  input_prompt: string;
+  bad_output: string;
+  fixed_output: string;
+  context: Record<string, unknown>;
+}
+
 export interface PipelineRunResponse {
   status: string;
   total_time: number;

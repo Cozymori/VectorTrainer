@@ -21,7 +21,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
 
-const MODELS = [
+const BASE_MODELS = [
   "gpt-4o-mini-2024-07-18",
   "gpt-4o-2024-08-06",
   "gpt-3.5-turbo-0125",
@@ -29,7 +29,8 @@ const MODELS = [
 
 export default function FineTuningPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [model, setModel] = useState(MODELS[0]);
+  const [model, setModel] = useState(BASE_MODELS[0]);
+  const [customModel, setCustomModel] = useState("");
   const [nEpochs, setNEpochs] = useState(3);
   const [apiKey, setApiKey] = useState("");
   const [maxBudget, setMaxBudget] = useState(10);
@@ -122,20 +123,44 @@ export default function FineTuningPage() {
             <CardContent className="p-5 space-y-4">
               <div>
                 <label className="text-xs text-muted-foreground block mb-2">
-                  Model
+                  Base Model
                 </label>
-                <Select value={model} onValueChange={setModel}>
+                <Select
+                  value={customModel ? "__custom__" : model}
+                  onValueChange={(v) => {
+                    if (v === "__custom__") {
+                      setCustomModel(model);
+                    } else {
+                      setModel(v);
+                      setCustomModel("");
+                    }
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MODELS.map((m) => (
+                    {BASE_MODELS.map((m) => (
                       <SelectItem key={m} value={m}>
                         {m}
                       </SelectItem>
                     ))}
+                    <SelectItem value="__custom__">
+                      Custom (fine-tuned model)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                {customModel !== "" && (
+                  <Input
+                    className="mt-2"
+                    placeholder="ft:gpt-4o-mini-2024-07-18:org::..."
+                    value={customModel}
+                    onChange={(e) => {
+                      setCustomModel(e.target.value);
+                      setModel(e.target.value);
+                    }}
+                  />
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground block mb-2">
@@ -238,9 +263,25 @@ export default function FineTuningPage() {
                 {checkingStatus ? "Checking..." : "Check Status"}
               </Button>
               {jobStatus && (
-                <pre className="text-xs font-mono bg-muted/50 p-3 rounded-md overflow-auto max-h-48">
-                  {JSON.stringify(jobStatus, null, 2)}
-                </pre>
+                <>
+                  <pre className="text-xs font-mono bg-muted/50 p-3 rounded-md overflow-auto max-h-48">
+                    {JSON.stringify(jobStatus, null, 2)}
+                  </pre>
+                  {typeof jobStatus.fine_tuned_model === "string" &&
+                    jobStatus.fine_tuned_model && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-primary"
+                        onClick={() => {
+                          setCustomModel(jobStatus.fine_tuned_model as string);
+                          setModel(jobStatus.fine_tuned_model as string);
+                        }}
+                      >
+                        Use {(jobStatus.fine_tuned_model as string).slice(0, 40)}... as base model
+                      </Button>
+                    )}
+                </>
               )}
             </CardContent>
           </Card>

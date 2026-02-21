@@ -35,9 +35,31 @@ class RollbackRequest(BaseModel):
     version_id: str
 
 
+class FeedbackPairCreate(BaseModel):
+    input_prompt: str
+    bad_output: str
+    fixed_output: str
+    context: Dict[str, Any] = {}
+
+
+class FeedbackPairUpdate(BaseModel):
+    input_prompt: Optional[str] = None
+    bad_output: Optional[str] = None
+    fixed_output: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------
+
+
+class FeedbackPairResponse(BaseModel):
+    id: str
+    input_prompt: str
+    bad_output: str
+    fixed_output: str
+    context: Dict[str, Any]
 
 
 class GoldenCandidateResponse(BaseModel):

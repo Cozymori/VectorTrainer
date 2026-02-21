@@ -28,7 +28,9 @@ from vector_trainer.types import GoldenCandidate
 
 from .deps import (
     ALL_FUNCTION_NAMES,
-    FEEDBACK_PAIRS,
+    feedback_pairs_store,
+    generate_fp_id,
+    get_feedback_pairs_as_dataclass,
     get_mock_dataset_manager,
     pipeline_state,
 )
@@ -36,6 +38,9 @@ from .schemas import (
     CostEstimateRequest,
     CostEstimateResponse,
     DiffAnalysisResponse,
+    FeedbackPairCreate,
+    FeedbackPairResponse,
+    FeedbackPairUpdate,
     GoldenCandidateResponse,
     HookVersionResponse,
     PipelineRunRequest,
@@ -126,7 +131,7 @@ def _run_pipeline(
     # Stage 2: Synthesize
     t0 = time.time()
     analyzer = FeedbackDiffAnalyzer()
-    diffs = [analyzer.analyze(pair) for pair in FEEDBACK_PAIRS]
+    diffs = [analyzer.analyze(pair) for pair in get_feedback_pairs_as_dataclass()]
 
     synthesizer = RuleSetSynthesizer()
     rules = synthesizer.synthesize(diffs)
@@ -177,6 +182,54 @@ def _run_pipeline(
     results["total_time"] = sum(stage_times.values())
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Feedback Pairs CRUD
+# ---------------------------------------------------------------------------
+
+
+@router.get("/feedback-pairs", response_model=List[FeedbackPairResponse])
+async def list_feedback_pairs() -> List[FeedbackPairResponse]:
+    """Return all feedback pairs."""
+    return [FeedbackPairResponse(**item) for item in feedback_pairs_store]
+
+
+@router.post("/feedback-pairs", response_model=FeedbackPairResponse, status_code=201)
+async def create_feedback_pair(body: FeedbackPairCreate) -> FeedbackPairResponse:
+    """Add a new feedback pair."""
+    item = {
+        "id": generate_fp_id(),
+        "input_prompt": body.input_prompt,
+        "bad_output": body.bad_output,
+        "fixed_output": body.fixed_output,
+        "context": body.context,
+    }
+    feedback_pairs_store.append(item)
+    return FeedbackPairResponse(**item)
+
+
+@router.put("/feedback-pairs/{fp_id}", response_model=FeedbackPairResponse)
+async def update_feedback_pair(
+    fp_id: str, body: FeedbackPairUpdate
+) -> FeedbackPairResponse:
+    """Update an existing feedback pair."""
+    for item in feedback_pairs_store:
+        if item["id"] == fp_id:
+            updates = body.model_dump(exclude_none=True)
+            item.update(updates)
+            return FeedbackPairResponse(**item)
+    raise HTTPException(status_code=404, detail=f"Feedback pair {fp_id} not found")
+
+
+@router.delete("/feedback-pairs/{fp_id}")
+async def delete_feedback_pair(fp_id: str) -> Dict[str, str]:
+    """Delete a feedback pair."""
+    for i, item in enumerate(feedback_pairs_store):
+        if item["id"] == fp_id:
+            feedback_pairs_store.pop(i)
+            return {"status": "ok", "deleted": fp_id}
+    raise HTTPException(status_code=404, detail=f"Feedback pair {fp_id} not found")
 
 
 # ---------------------------------------------------------------------------

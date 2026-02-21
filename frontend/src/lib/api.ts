@@ -88,3 +88,41 @@ export async function startTraining(params: {
 export async function getTrainingStatus(jobId: string) {
   return apiFetch<Record<string, unknown>>(`/pipeline/status/${jobId}`);
 }
+
+export async function getFeedbackPairs() {
+  return apiFetch<import("./types").FeedbackPair[]>("/feedback-pairs");
+}
+
+export async function createFeedbackPair(data: {
+  input_prompt: string;
+  bad_output: string;
+  fixed_output: string;
+  context?: Record<string, unknown>;
+}) {
+  return apiFetch<import("./types").FeedbackPair>("/feedback-pairs", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateFeedbackPair(
+  id: string,
+  data: {
+    input_prompt?: string;
+    bad_output?: string;
+    fixed_output?: string;
+    context?: Record<string, unknown>;
+  }
+) {
+  return apiFetch<import("./types").FeedbackPair>(`/feedback-pairs/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteFeedbackPair(id: string) {
+  return apiFetch<{ status: string; deleted: string }>(
+    `/feedback-pairs/${id}`,
+    { method: "DELETE" }
+  );
+}

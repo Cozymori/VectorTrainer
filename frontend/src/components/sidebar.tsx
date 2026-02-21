@@ -11,6 +11,7 @@ import { runPipeline } from "@/lib/api";
 const NAV_ITEMS = [
   { href: "/", label: "Pipeline" },
   { href: "/golden-data", label: "Golden Data" },
+  { href: "/feedback", label: "Feedback" },
   { href: "/rules", label: "Rules" },
   { href: "/hook-script", label: "Hook Script" },
   { href: "/fine-tuning", label: "Fine-tuning" },
