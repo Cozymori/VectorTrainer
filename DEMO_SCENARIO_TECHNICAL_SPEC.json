@@ -1,0 +1,989 @@
+{
+  "metadata": {
+    "title": "VectorTrainer Product Review Analysis Service - Technical Specification",
+    "version": "1.0",
+    "created": "2025-02-21",
+    "purpose": "Research-only demo scenario for VectorTrainer using VectorWave",
+    "domain": "E-commerce Product Review Analysis",
+    "target_audience": "VectorTrainer team, documentation, tutorials"
+  },
+  "executive_summary": {
+    "num_functions": 4,
+    "total_execution_logs": 60,
+    "feedback_pairs": 75,
+    "total_golden_data_records": 20,
+    "synthesized_rules": 14,
+    "estimated_cost_usd": 0.35,
+    "estimated_duration_minutes": "8-13"
+  },
+  "functions": {
+    "function_1": {
+      "name": "generate_review_summary",
+      "purpose": "Summarize product reviews into concise, structured assessments",
+      "function_signature": "generate_review_summary(review_text: str) -> str",
+      "openai_config": {
+        "model": "gpt-4o-mini",
+        "system_prompt": "You are a product review summarizer. Extract key points, sentiment, and rating from customer reviews. Be concise but comprehensive.",
+        "temperature": 0.5,
+        "max_tokens": 200,
+        "response_format": "text"
+      },
+      "input_examples_count": 15,
+      "sample_inputs": [
+        {
+          "id": 1,
+          "text": "I bought this laptop for work. It's incredibly fast, the screen is crystal clear, and the battery lasts all day. Highly recommended!"
+        },
+        {
+          "id": 2,
+          "text": "The phone screen broke after just 3 months. Customer service was unhelpful. Total waste of money."
+        },
+        {
+          "id": 3,
+          "text": "Average product. Does what it says but nothing special. Good value for the price point."
+        },
+        {
+          "id": 4,
+          "text": "Absolutely love this coffee maker! Makes the best espresso I've ever had at home. Worth every penny."
+        },
+        {
+          "id": 5,
+          "text": "The headphones sound great but the left ear stopped working after 6 months. Poor build quality."
+        },
+        {
+          "id": 6,
+          "text": "It's okay. Not the best, not the worst. Kind of disappointed but also not angry about it."
+        },
+        {
+          "id": 7,
+          "text": "This monitor changed my productivity! The color accuracy is professional-grade and the stand is very adjustable."
+        },
+        {
+          "id": 8,
+          "text": "Terrible! The product arrived damaged. The company wouldn't replace it. Never buying from them again."
+        },
+        {
+          "id": 9,
+          "text": "My kid loves this toy. It's educational and keeps him entertained for hours. Durable too."
+        },
+        {
+          "id": 10,
+          "text": "Received a defective unit. Return process was complicated. Avoided a headache by going elsewhere next time."
+        },
+        {
+          "id": 11,
+          "text": "The camera quality is stunning. Night mode is particularly impressive. Blows away competitors."
+        },
+        {
+          "id": 12,
+          "text": "Mediocre performance. The app crashes frequently. Couldn't return it because I lost the receipt."
+        },
+        {
+          "id": 13,
+          "text": "I use this tool every single day. Best investment I've made for my garage. Absolutely fantastic."
+        },
+        {
+          "id": 14,
+          "text": "The packaging was beautiful but the product itself is fragile. Broke during unpacking. Very disappointed."
+        },
+        {
+          "id": 15,
+          "text": "This keyboard is a game-changer! Mechanical switches feel premium and typing is effortless."
+        }
+      ],
+      "common_failure_modes": [
+        "Output too vague (e.g., 'Good product')",
+        "Missing structured format (no Rating: X/5)",
+        "Insufficient detail about features",
+        "No sentiment indicator (✓/✗/~)",
+        "No actionable summary structure"
+      ],
+      "feedback_pairs": [
+        {
+          "pair_id": "1.1",
+          "input_summary": "Review about fast laptop with clear screen",
+          "bad_output": "Good laptop",
+          "fixed_output": "✓ POSITIVE | Fast processing, crystal clear display, excellent battery life. Rating: 5/5. Ideal for: Professionals needing portable powerhouse.",
+          "diff_category": "Added structured format, specific features",
+          "edit_distance": 55,
+          "similarity_score": 0.15
+        },
+        {
+          "pair_id": "1.2",
+          "input_summary": "Phone with screen durability issue",
+          "bad_output": "Bad phone, don't buy",
+          "fixed_output": "✗ NEGATIVE | Screen durability critical failure (3 months). Customer service unresponsive. Rating: 1/5. Recommendation: Avoid.",
+          "diff_category": "Added timeline, specific failure point, severity",
+          "edit_distance": 72,
+          "similarity_score": 0.12
+        },
+        {
+          "pair_id": "1.3",
+          "input_summary": "Average coffee maker review",
+          "bad_output": "Okay product",
+          "fixed_output": "~ NEUTRAL | Coffee maker performs as advertised. No standout features. Reasonable price-to-quality ratio. Rating: 3/5. Consider if: Budget is primary factor.",
+          "diff_category": "Added differentiation of neutral, value positioning",
+          "edit_distance": 65,
+          "similarity_score": 0.18
+        },
+        {
+          "pair_id": "1.4",
+          "input_summary": "Educational toy review",
+          "bad_output": "Good for kids",
+          "fixed_output": "✓ POSITIVE | Educational content + durable construction. Child engagement: sustained (multi-hour). Build quality: strong. Rating: 5/5. Best for: Parents seeking educational entertainment.",
+          "diff_category": "Added quantification, target audience",
+          "edit_distance": 68,
+          "similarity_score": 0.14
+        },
+        {
+          "pair_id": "1.5",
+          "input_summary": "Fragile product that broke during delivery",
+          "bad_output": "Product broke",
+          "fixed_output": "✗ NEGATIVE | Critical packaging failure - unit arrived damaged, irreplaceable. Rating: 1/5. Core issue: Insufficient protective packaging. Recommendation: Manufacturer should improve shipping materials.",
+          "diff_category": "Added root cause analysis, improvement suggestion",
+          "edit_distance": 78,
+          "similarity_score": 0.10
+        }
+      ]
+    },
+    "function_2": {
+      "name": "extract_sentiment",
+      "purpose": "Extract fine-grained sentiment analysis with emotion scores",
+      "function_signature": "extract_sentiment(review_text: str) -> Dict[str, float]",
+      "openai_config": {
+        "model": "gpt-4o-mini",
+        "system_prompt": "Extract sentiment and emotions from text. Return JSON with: overall_sentiment (0-100), confidence (0-100), emotions: {joy, trust, fear, surprise, sadness, disgust, anger, anticipation} (0-100 each).",
+        "temperature": 0.3,
+        "max_tokens": 300,
+        "response_format": "json_object"
+      },
+      "input_examples_count": 15,
+      "sample_inputs": [
+        {
+          "id": 1,
+          "text": "This is hands-down the best purchase I've made all year! I'm absolutely thrilled and can't stop recommending it to friends!"
+        },
+        {
+          "id": 2,
+          "text": "I'm extremely disappointed. The product is defective and customer service was rude and unhelpful. Very frustrated."
+        },
+        {
+          "id": 3,
+          "text": "It's alright. Nothing spectacular, but it does the job. I'm satisfied enough."
+        },
+        {
+          "id": 4,
+          "text": "I feel betrayed by this brand. I've been loyal for years but this product is clearly low-effort cash grab."
+        },
+        {
+          "id": 5,
+          "text": "Genuinely impressed! The attention to detail is remarkable. I'm excited to explore all its features."
+        },
+        {
+          "id": 6,
+          "text": "Worst experience ever. The product failed immediately, refund took forever. I'm angry and will never return."
+        },
+        {
+          "id": 7,
+          "text": "Pretty good. Minor issues but overall I'm happy with my purchase."
+        },
+        {
+          "id": 8,
+          "text": "This surprised me in the best way! Exceeded my expectations significantly. Very pleased."
+        },
+        {
+          "id": 9,
+          "text": "I'm concerned about durability based on reviews. Not sure if I should keep it or return it."
+        },
+        {
+          "id": 10,
+          "text": "Absolutely love it! Best decision I've made. Can't imagine life without this product now."
+        },
+        {
+          "id": 11,
+          "text": "Meh. It's okay. Neither good nor bad. Just fills the need I had."
+        },
+        {
+          "id": 12,
+          "text": "This is infuriating! The company made false claims in the advertisement. Feeling cheated."
+        },
+        {
+          "id": 13,
+          "text": "Cautiously optimistic. The product shows promise but needs better documentation to maximize value."
+        },
+        {
+          "id": 14,
+          "text": "I've never been happier with a purchase. The quality is exceptional and customer service is outstanding."
+        },
+        {
+          "id": 15,
+          "text": "Disappointed but not surprised. Quality has been declining for a while with this brand."
+        }
+      ],
+      "common_failure_modes": [
+        "Invalid JSON structure (missing required fields)",
+        "Emotion scores not in range [0-100]",
+        "Misidentifying sarcasm (positive words but negative sentiment)",
+        "Missing emotional nuance (all emotions at 0)",
+        "Confidence scores disconnected from sentiment strength"
+      ],
+      "feedback_pairs": [
+        {
+          "pair_id": "2.1",
+          "input_summary": "Betrayal sentiment from loyal customer",
+          "bad_output": "{\"overall_sentiment\": 45, \"confidence\": 60, \"emotions\": {\"joy\": 50, \"trust\": 30, \"fear\": 10, \"surprise\": 0, \"sadness\": 20, \"disgust\": 15, \"anger\": 15, \"anticipation\": 20}}",
+          "fixed_output": "{\"overall_sentiment\": 20, \"confidence\": 92, \"emotions\": {\"joy\": 0, \"trust\": 5, \"fear\": 40, \"surprise\": 0, \"sadness\": 70, \"disgust\": 65, \"anger\": 75, \"anticipation\": 0}}",
+          "diff_category": "Fixed emotion weighting for betrayal pattern",
+          "edit_distance": 85,
+          "similarity_score": 0.08
+        },
+        {
+          "pair_id": "2.2",
+          "input_summary": "Sarcastic positive statement",
+          "bad_output": "{\"overall_sentiment\": 85, \"confidence\": 90, \"emotions\": {\"joy\": 80, \"trust\": 70, \"fear\": 5, \"surprise\": 10, \"sadness\": 0, \"disgust\": 0, \"anger\": 0, \"anticipation\": 60}}",
+          "fixed_output": "{\"overall_sentiment\": 15, \"confidence\": 88, \"emotions\": {\"joy\": 0, \"trust\": 5, \"fear\": 20, \"surprise\": 10, \"sadness\": 40, \"disgust\": 60, \"anger\": 50, \"anticipation\": 0}}",
+          "diff_category": "Sarcasm detection and sentiment inversion",
+          "edit_distance": 92,
+          "similarity_score": 0.05
+        },
+        {
+          "pair_id": "2.3",
+          "input_summary": "Cautious optimism",
+          "bad_output": "{\"overall_sentiment\": 70, \"confidence\": 80, \"emotions\": {\"joy\": 65, \"trust\": 60, \"fear\": 10, \"surprise\": 5, \"sadness\": 0, \"disgust\": 0, \"anger\": 0, \"anticipation\": 40}}",
+          "fixed_output": "{\"overall_sentiment\": 58, \"confidence\": 70, \"emotions\": {\"joy\": 45, \"trust\": 35, \"fear\": 35, \"surprise\": 5, \"sadness\": 5, \"disgust\": 0, \"anger\": 0, \"anticipation\": 60}}",
+          "diff_category": "Added confidence calibration, anticipation weight, fear balance",
+          "edit_distance": 48,
+          "similarity_score": 0.22
+        },
+        {
+          "pair_id": "2.4",
+          "input_summary": "Mixed emotions (impressed but concerned)",
+          "bad_output": "{\"overall_sentiment\": 75, \"confidence\": 85, \"emotions\": {\"joy\": 70, \"trust\": 65, \"fear\": 0, \"surprise\": 15, \"sadness\": 0, \"disgust\": 0, \"anger\": 0, \"anticipation\": 70}}",
+          "fixed_output": "{\"overall_sentiment\": 68, \"confidence\": 75, \"emotions\": {\"joy\": 70, \"trust\": 60, \"fear\": 40, \"surprise\": 25, \"sadness\": 0, \"disgust\": 0, \"anger\": 0, \"anticipation\": 75}}",
+          "diff_category": "Balanced mixed emotions, lowered confidence for ambiguity",
+          "edit_distance": 32,
+          "similarity_score": 0.35
+        },
+        {
+          "pair_id": "2.5",
+          "input_summary": "Incoherent JSON response",
+          "bad_output": "Invalid JSON or empty response",
+          "fixed_output": "{\"overall_sentiment\": 40, \"confidence\": 85, \"emotions\": {\"joy\": 35, \"trust\": 40, \"fear\": 20, \"surprise\": 10, \"sadness\": 25, \"disgust\": 15, \"anger\": 10, \"anticipation\": 30}}",
+          "diff_category": "JSON validation and structure enforcement",
+          "edit_distance": 200,
+          "similarity_score": 0.00
+        }
+      ]
+    },
+    "function_3": {
+      "name": "generate_product_recommendation",
+      "purpose": "Generate personalized product recommendations based on user profile and category",
+      "function_signature": "generate_product_recommendation(user_preferences: str, product_category: str) -> str",
+      "openai_config": {
+        "model": "gpt-4o-mini",
+        "system_prompt": "You are a product recommendation expert. Given user preferences and a product category, suggest 3 specific products with reasoning. Format: Product Name | Reason | Price Range",
+        "temperature": 0.7,
+        "max_tokens": 400,
+        "response_format": "text"
+      },
+      "input_examples_count": 15,
+      "sample_inputs": [
+        {
+          "id": 1,
+          "preferences": "Professional developer, needs high-performance machine for machine learning",
+          "category": "Laptop"
+        },
+        {
+          "id": 2,
+          "preferences": "Budget-conscious, casual gaming once a week",
+          "category": "Gaming Monitor"
+        },
+        {
+          "id": 3,
+          "preferences": "Fitness enthusiast, tracks metrics obsessively",
+          "category": "Smartwatch"
+        },
+        {
+          "id": 4,
+          "preferences": "Travels frequently, needs noise isolation, quality audio",
+          "category": "Headphones"
+        },
+        {
+          "id": 5,
+          "preferences": "Small apartment, minimal clutter, aesthetic appeal",
+          "category": "Coffee Maker"
+        },
+        {
+          "id": 6,
+          "preferences": "Video content creator, needs color accuracy and portability",
+          "category": "Monitor"
+        },
+        {
+          "id": 7,
+          "preferences": "Audiophile, uses lossless formats, home listening",
+          "category": "Speakers"
+        },
+        {
+          "id": 8,
+          "preferences": "Business professional, daily commute, video calls important",
+          "category": "Laptop"
+        },
+        {
+          "id": 9,
+          "preferences": "Outdoor enthusiast, durability priority, water resistance needed",
+          "category": "Camera"
+        },
+        {
+          "id": 10,
+          "preferences": "Student on tight budget, needs multitasking capability",
+          "category": "Laptop"
+        },
+        {
+          "id": 11,
+          "preferences": "Home office worker, ergonomics critical for 8-hour days",
+          "category": "Keyboard"
+        },
+        {
+          "id": 12,
+          "preferences": "Night shift security guard, needs reliability and battery life",
+          "category": "Smartwatch"
+        },
+        {
+          "id": 13,
+          "preferences": "Photo hobbyist, learning composition, budget under $500",
+          "category": "Camera"
+        },
+        {
+          "id": 14,
+          "preferences": "Musician, needs low-latency monitoring for recording",
+          "category": "Headphones"
+        },
+        {
+          "id": 15,
+          "preferences": "Environmental conscious, sustainable materials important",
+          "category": "Smartphone"
+        }
+      ],
+      "common_failure_modes": [
+        "Recommending products outside specified category",
+        "Ignoring user preferences entirely",
+        "Recommending unavailable/discontinued products",
+        "Poor price-to-value reasoning",
+        "Missing format structure (Product | Reason | Price)"
+      ],
+      "feedback_pairs": [
+        {
+          "pair_id": "3.1",
+          "input_summary": "ML engineer needing laptop",
+          "bad_output": "MacBook and some gaming laptops",
+          "fixed_output": "1) MacBook Pro 16\" M3 Max | Professional ML with 21-core GPU, 128GB unified memory | $3,500\n2) NVIDIA H100 Laptop | Maximum CUDA cores for deep learning | $5,000+\n3) Lenovo ThinkPad P1 | Enterprise ML, cost-effective | $2,200",
+          "diff_category": "Added structure, specific specs, price ranges",
+          "edit_distance": 110,
+          "similarity_score": 0.06
+        },
+        {
+          "pair_id": "3.2",
+          "input_summary": "Budget-conscious gamer",
+          "bad_output": "Get any gaming monitor",
+          "fixed_output": "1) ASUS ProArt PA247CV | 1440p, 165Hz at budget, good balance | $349\n2) ViewSonic VP2468a | IPS panel, 75Hz, business-friendly | $299\n3) Dell P2423D | Professional color, affordable 1440p | $369",
+          "diff_category": "Added price-awareness, gaming focus, value reasoning",
+          "edit_distance": 95,
+          "similarity_score": 0.08
+        },
+        {
+          "pair_id": "3.3",
+          "input_summary": "Audiophile seeking lossless",
+          "bad_output": "Get some expensive speakers",
+          "fixed_output": "1) KEF LS60 Wireless | Lossless streaming, reference-grade frequency response | $2,995\n2) Monitor Audio Platinum 7G | THD <0.05%, neutral soundstage | $1,800\n3) Dynaudio Contour 20 | Exceptional detail, natural timbre | $1,500",
+          "diff_category": "Added technical specs, lossless support emphasis",
+          "edit_distance": 108,
+          "similarity_score": 0.05
+        },
+        {
+          "pair_id": "3.4",
+          "input_summary": "Student on budget for multitasking",
+          "bad_output": "Use any student laptop",
+          "fixed_output": "1) ASUS Vivobook 15 | 16GB RAM, Ryzen 7, handles multitasking, $699\n2) Lenovo IdeaPad 5 | 512GB SSD, good build, $649\n3) HP Pavilion 15 | Budget-friendly, 8-core processor, $549",
+          "diff_category": "Added RAM/specs, price tiers for decisions",
+          "edit_distance": 88,
+          "similarity_score": 0.09
+        },
+        {
+          "pair_id": "3.5",
+          "input_summary": "Sustainability-conscious buyer",
+          "bad_output": "Just get a regular phone",
+          "fixed_output": "1) Fairphone 5 | Repairable design, ethical sourcing, lasts 5+ years | $649\n2) Samsung Galaxy S24 | Recycled materials, long software support | $799\n3) Google Pixel 9 | Sustainable packaging, repair program | $799",
+          "diff_category": "Sustainability messaging, longevity emphasis",
+          "edit_distance": 98,
+          "similarity_score": 0.07
+        }
+      ]
+    },
+    "function_4": {
+      "name": "translate_review",
+      "purpose": "Translate product reviews while preserving sentiment and nuance",
+      "function_signature": "translate_review(review_text: str, target_language: str) -> str",
+      "openai_config": {
+        "model": "gpt-4o-mini",
+        "system_prompt": "You are a professional translator. Translate the review to {target_language} while preserving sentiment, slang, and emotional tone. Add [TONE: ...] prefix describing emotional tone for reference.",
+        "temperature": 0.1,
+        "max_tokens": 300,
+        "response_format": "text"
+      },
+      "input_examples_count": 15,
+      "sample_inputs": [
+        {
+          "id": 1,
+          "review": "This laptop is absolutely amazing! Can't recommend it enough.",
+          "target_language": "Spanish"
+        },
+        {
+          "id": 2,
+          "review": "Terrible product, complete waste of money. Stay away!",
+          "target_language": "French"
+        },
+        {
+          "id": 3,
+          "review": "It's okay, nothing special but it works fine.",
+          "target_language": "German"
+        },
+        {
+          "id": 4,
+          "review": "I'm blown away by the quality! Best purchase ever!",
+          "target_language": "Japanese"
+        },
+        {
+          "id": 5,
+          "review": "The product broke after a week. So disappointed.",
+          "target_language": "Mandarin Chinese"
+        },
+        {
+          "id": 6,
+          "review": "Not bad, could be better, but decent for the price.",
+          "target_language": "Korean"
+        },
+        {
+          "id": 7,
+          "review": "Absolutely love it! Been using for a year, still perfect.",
+          "target_language": "Portuguese"
+        },
+        {
+          "id": 8,
+          "review": "Honestly, I regret this purchase. Customer service ignored me.",
+          "target_language": "Italian"
+        },
+        {
+          "id": 9,
+          "review": "Great value, exceeded my expectations significantly!",
+          "target_language": "Russian"
+        },
+        {
+          "id": 10,
+          "review": "Meh, it's average. Does what it says, nothing more.",
+          "target_language": "Dutch"
+        },
+        {
+          "id": 11,
+          "review": "Outstanding craftsmanship and attention to detail. Highly impressed.",
+          "target_language": "Swedish"
+        },
+        {
+          "id": 12,
+          "review": "Scam! The product isn't what they advertised at all!",
+          "target_language": "Polish"
+        },
+        {
+          "id": 13,
+          "review": "Works as intended. Not perfect but acceptable.",
+          "target_language": "Turkish"
+        },
+        {
+          "id": 14,
+          "review": "This changed my life! Can't imagine going back!",
+          "target_language": "Arabic"
+        },
+        {
+          "id": 15,
+          "review": "Okay product but shipping took forever. Annoying.",
+          "target_language": "Thai"
+        }
+      ],
+      "common_failure_modes": [
+        "Lost emotional tone/sentiment in translation",
+        "Incorrect grammar or awkward phrasing",
+        "Failed to detect or translate slang/colloquialisms",
+        "Over-literal translation losing natural idioms",
+        "Missing tone annotation prefix",
+        "Hallucinating content not in original review"
+      ],
+      "feedback_pairs": [
+        {
+          "pair_id": "4.1",
+          "input_summary": "Enthusiastic English → Spanish",
+          "bad_output": "La computadora es excelente",
+          "fixed_output": "[TONE: Enthusiastic, emphatic] ¡Esta computadora portátil es absolutamente increíble! ¡No puedo recomendarla lo suficiente!",
+          "diff_category": "Tone preservation, exclamation points, intensity",
+          "edit_distance": 67,
+          "similarity_score": 0.12
+        },
+        {
+          "pair_id": "4.2",
+          "input_summary": "Angry complaint → French",
+          "bad_output": "Le produit est mauvais et cher",
+          "fixed_output": "[TONE: Angry, frustrated, emphatic] Produit horrible, pure perte d'argent. Ne l'achetez pas! Restez à l'écart!",
+          "diff_category": "Added intensity markers, imperative warnings",
+          "edit_distance": 72,
+          "similarity_score": 0.10
+        },
+        {
+          "pair_id": "4.3",
+          "input_summary": "Sarcastic review → German",
+          "bad_output": "Das Produkt ist wunderbar",
+          "fixed_output": "[TONE: Sarcastic, frustrated] Ach ja, absolut 'wunderbar'! Ein echtes Meisterwerk der Mittelmäßigkeit.",
+          "diff_category": "Sarcasm indicators, air quotes, irony",
+          "edit_distance": 78,
+          "similarity_score": 0.08
+        },
+        {
+          "pair_id": "4.4",
+          "input_summary": "Neutral English → Japanese",
+          "bad_output": "製品は大丈夫です",
+          "fixed_output": "[TONE: Neutral, lukewarm] 製品は期待通りに機能します。特に特別なことはありませんが、悪くもありません。",
+          "diff_category": "Nuance addition, qualifying phrases",
+          "edit_distance": 85,
+          "similarity_score": 0.09
+        },
+        {
+          "pair_id": "4.5",
+          "input_summary": "Colloquial slang → Portuguese",
+          "bad_output": "O produto é bom demais para acreditar",
+          "fixed_output": "[TONE: Enthusiastic, casual] Cara, esse produto é simplesmente demais! Não consigo parar de recomendar!",
+          "diff_category": "Colloquial language, casual register",
+          "edit_distance": 71,
+          "similarity_score": 0.11
+        }
+      ]
+    }
+  },
+  "vector_clustering": {
+    "embedding_model": "OpenAI text-embedding-3-small",
+    "embedding_dimension": 1536,
+    "total_execution_logs": 60,
+    "epsilon_threshold": 0.25,
+    "top_k_candidates": 15,
+    "clusters": [
+      {
+        "cluster_id": "A",
+        "function": "generate_review_summary",
+        "name": "Positive Reviews (High Density)",
+        "size": 12,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.90, 0.98],
+        "centroid": [0.75, 0.60, 0.70, 0.55],
+        "cosine_similarity_min": 0.92,
+        "interpretation": "Well-established patterns for positive product summaries"
+      },
+      {
+        "cluster_id": "B",
+        "function": "generate_review_summary",
+        "name": "Mixed/Neutral Reviews (Medium Density)",
+        "size": 8,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.75, 0.88],
+        "centroid": [0.35, 0.75, 0.25, 0.65],
+        "cosine_similarity_min": 0.85,
+        "interpretation": "Secondary pattern for mixed sentiment summaries"
+      },
+      {
+        "cluster_id": "C",
+        "function": "generate_review_summary",
+        "name": "Emotional/Creative Reviews (Low Density + SUCCESS)",
+        "size": 2,
+        "strategy": "ANOMALY",
+        "density_range": [0.20, 0.50],
+        "centroid": [0.15, 0.15, 0.90, 0.15],
+        "cosine_similarity_max": 0.60,
+        "interpretation": "Unusual but successful cases (emotional, poetic reviews)"
+      },
+      {
+        "cluster_id": "D",
+        "function": "extract_sentiment",
+        "name": "Clear Sentiment (High Density)",
+        "size": 10,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.85, 0.96],
+        "centroid": [0.80, 0.70, 0.65, 0.75],
+        "cosine_similarity_min": 0.88,
+        "interpretation": "Clear positive/negative sentiment cases"
+      },
+      {
+        "cluster_id": "E",
+        "function": "extract_sentiment",
+        "name": "Ambiguous/Mixed Sentiment (Medium Density)",
+        "size": 7,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.70, 0.82],
+        "centroid": [0.50, 0.55, 0.50, 0.50],
+        "cosine_similarity_min": 0.80,
+        "interpretation": "Mixed emotion cases, confidence < 90%"
+      },
+      {
+        "cluster_id": "F",
+        "function": "generate_product_recommendation",
+        "name": "Professional Recommendations (High Density)",
+        "size": 11,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.82, 0.94],
+        "centroid": [0.85, 0.60, 0.70, 0.65],
+        "cosine_similarity_min": 0.86,
+        "interpretation": "Budget-aware, detailed recommendations"
+      },
+      {
+        "cluster_id": "G",
+        "function": "generate_product_recommendation",
+        "name": "Lifestyle/Creative Recommendations (Low Density + SUCCESS)",
+        "size": 2,
+        "strategy": "ANOMALY",
+        "density_range": [0.25, 0.55],
+        "centroid": [0.25, 0.85, 0.20, 0.90],
+        "cosine_similarity_max": 0.65,
+        "interpretation": "Successful cases of sustainability or niche preferences"
+      },
+      {
+        "cluster_id": "H",
+        "function": "translate_review",
+        "name": "Clear Tone Translations (High Density)",
+        "size": 11,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.88, 0.97],
+        "centroid": [0.70, 0.65, 0.75, 0.70],
+        "cosine_similarity_min": 0.90,
+        "interpretation": "Straightforward translations preserving tone"
+      },
+      {
+        "cluster_id": "I",
+        "function": "translate_review",
+        "name": "Nuanced/Sarcastic Translations (Medium Density)",
+        "size": 5,
+        "strategy": "STEADY_STATE",
+        "density_range": [0.70, 0.84],
+        "centroid": [0.45, 0.50, 0.55, 0.50],
+        "cosine_similarity_min": 0.78,
+        "interpretation": "Complex tone/idiom preservation"
+      },
+      {
+        "cluster_id": "J",
+        "function": "translate_review",
+        "name": "Slang/Colloquial Translations (Low Density + SUCCESS)",
+        "size": 2,
+        "strategy": "ANOMALY",
+        "density_range": [0.22, 0.48],
+        "centroid": [0.20, 0.20, 0.85, 0.25],
+        "cosine_similarity_max": 0.60,
+        "interpretation": "Successful slang/colloquial adaptation"
+      }
+    ],
+    "statistics": {
+      "steady_state_samples": 64,
+      "anomaly_samples": 6,
+      "total_samples": 70,
+      "golden_data_extracted": 20,
+      "extraction_ratio": "28.6%"
+    }
+  },
+  "synthesized_rules": {
+    "total_rules": 14,
+    "rule_sets": [
+      {
+        "rule_set_id": "SUMMARY_FORMATTING",
+        "function": "generate_review_summary",
+        "rules": [
+          {
+            "rule_id": "sum_format_001",
+            "priority": 10,
+            "description": "Enforce structured summary format",
+            "condition": "Output does not match pattern [SENTIMENT] | [FEATURE LIST] | Rating: [X]/5",
+            "action": "Enforce sentiment prefix (✓/✗/~), extract specific features, include rating",
+            "source_pair_indices": [0]
+          },
+          {
+            "rule_id": "sum_specific_features_002",
+            "priority": 9,
+            "description": "Enforce feature specificity",
+            "condition": "Summary lacks concrete product attributes (speed, durability, design, price, etc.)",
+            "action": "Inject instruction: Always mention 2-3 specific measurable features from the review",
+            "source_pair_indices": [1, 3]
+          },
+          {
+            "rule_id": "sum_numeric_rating_003",
+            "priority": 8,
+            "description": "Enforce numeric rating presence",
+            "condition": "No numeric rating provided",
+            "action": "Append Rating: [X]/5 where X inferred from sentiment",
+            "source_pair_indices": [2]
+          }
+        ]
+      },
+      {
+        "rule_set_id": "SENTIMENT_EXTRACTION",
+        "function": "extract_sentiment",
+        "rules": [
+          {
+            "rule_id": "sent_emotion_balance_004",
+            "priority": 10,
+            "description": "Balance emotion scores based on contradictions",
+            "condition": "Emotion scores are unbalanced or confidence < 60%",
+            "action": "Reweight emotions based on detected contradictions (e.g., high joy + low trust = cautious optimism)",
+            "source_pair_indices": [2, 3]
+          },
+          {
+            "rule_id": "sent_sarcasm_detect_005",
+            "priority": 9,
+            "description": "Detect and handle sarcasm",
+            "condition": "Text contains sarcastic markers (yeah, right, fantastic, etc.)",
+            "action": "Invert sentiment polarity; increase disgust/anger; decrease joy",
+            "source_pair_indices": [1]
+          },
+          {
+            "rule_id": "sent_json_valid_006",
+            "priority": 10,
+            "description": "Enforce valid JSON structure",
+            "condition": "Output is not valid JSON or missing required fields",
+            "action": "Enforce schema: {overall_sentiment, confidence, emotions: {...}}",
+            "source_pair_indices": [4]
+          }
+        ]
+      },
+      {
+        "rule_set_id": "RECOMMENDATION_LOGIC",
+        "function": "generate_product_recommendation",
+        "rules": [
+          {
+            "rule_id": "rec_category_enforce_007",
+            "priority": 10,
+            "description": "Enforce category match",
+            "condition": "Recommended products don't match specified category",
+            "action": "Filter and re-recommend only products within category",
+            "source_pair_indices": [0]
+          },
+          {
+            "rule_id": "rec_price_sensitivity_008",
+            "priority": 9,
+            "description": "Apply price sensitivity",
+            "condition": "User preferences mention budget but prices exceed $1,500",
+            "action": "Prioritize products under $800; add cost justification",
+            "source_pair_indices": [1, 3]
+          },
+          {
+            "rule_id": "rec_values_alignment_009",
+            "priority": 8,
+            "description": "Align with user values",
+            "condition": "User preferences mention sustainability/ethics but recommendation is generic",
+            "action": "Inject values-aligned options (fair-trade, certified, repairable, sustainable)",
+            "source_pair_indices": [4]
+          },
+          {
+            "rule_id": "rec_format_enforce_010",
+            "priority": 9,
+            "description": "Enforce recommendation format",
+            "condition": "Output doesn't follow Product Name | Reason | Price Range format",
+            "action": "Reformat with clear delimiters and 3 products minimum",
+            "source_pair_indices": [0, 1, 2]
+          }
+        ]
+      },
+      {
+        "rule_set_id": "TRANSLATION_FIDELITY",
+        "function": "translate_review",
+        "rules": [
+          {
+            "rule_id": "trans_tone_preserve_011",
+            "priority": 10,
+            "description": "Preserve emotional tone",
+            "condition": "Translation loses emotional intensity (missing exclamation marks, intensifiers)",
+            "action": "Match punctuation and emotional markers from source (!)→(!)",
+            "source_pair_indices": [0]
+          },
+          {
+            "rule_id": "trans_sarcasm_mark_012",
+            "priority": 9,
+            "description": "Mark sarcasm in translation",
+            "condition": "Source contains sarcasm/irony but translation reads literal",
+            "action": "Add quotation marks or sarcasm indicators to target language",
+            "source_pair_indices": [2]
+          },
+          {
+            "rule_id": "trans_colloquial_adapt_013",
+            "priority": 8,
+            "description": "Adapt colloquial language",
+            "condition": "Source uses informal/colloquial language but translation is overly formal",
+            "action": "Use target language colloquialisms; preserve register",
+            "source_pair_indices": [4]
+          },
+          {
+            "rule_id": "trans_tone_prefix_014",
+            "priority": 8,
+            "description": "Enforce tone annotation",
+            "condition": "Missing [TONE: ...] annotation",
+            "action": "Always prepend [TONE: <emotions>, <intensity>] to translation",
+            "source_pair_indices": [1, 3]
+          }
+        ]
+      }
+    ]
+  },
+  "fine_tuning_config": {
+    "model": "gpt-4o-mini",
+    "training_data": {
+      "format": "JSONL (ChatML)",
+      "num_records": 20,
+      "avg_tokens_per_record": 180,
+      "total_tokens": 3800,
+      "epochs": 3,
+      "total_tokens_with_epochs": 11400
+    },
+    "cost_estimation": {
+      "training_cost_usd": 0.34,
+      "per_million_tokens_usd": 30,
+      "hosting_cost_per_day_usd": 0.01,
+      "total_estimated_cost_usd": 0.35,
+      "currency": "USD"
+    },
+    "performance_benchmarks": {
+      "before_finetuning": {
+        "summary_format_adherence_percent": 60,
+        "sentiment_emotion_balance_percent": 70,
+        "recommendation_relevance_percent": 65,
+        "translation_tone_preservation_percent": 75
+      },
+      "after_finetuning": {
+        "summary_format_adherence_percent": 90,
+        "sentiment_emotion_balance_percent": 85,
+        "recommendation_relevance_percent": 85,
+        "translation_tone_preservation_percent": 88
+      },
+      "improvement_percent": {
+        "summary_format_adherence_percent": 30,
+        "sentiment_emotion_balance_percent": 15,
+        "recommendation_relevance_percent": 20,
+        "translation_tone_preservation_percent": 13
+      }
+    }
+  },
+  "execution_timeline": {
+    "phase_1_vectorwave_setup": {
+      "name": "VectorWave Setup & Execution Logging",
+      "duration_minutes": "2-3",
+      "tasks": [
+        "Initialize Weaviate connection",
+        "Execute 60 function calls via @vectorize decorator",
+        "Await async embedding indexing",
+        "Verify execution logs in vector DB"
+      ]
+    },
+    "phase_2_golden_data_selection": {
+      "name": "Golden Data Selection",
+      "duration_minutes": "1-2",
+      "tasks": [
+        "Load 60 execution logs from Weaviate",
+        "Build weighted similarity graph (epsilon=0.25)",
+        "Select STEADY STATE candidates (12-15 samples)",
+        "Select ANOMALY candidates (4-6 samples)",
+        "Export golden data as ChatML JSONL (20 records)"
+      ]
+    },
+    "phase_3_prompt_synthesis": {
+      "name": "Prompt Synthesis",
+      "duration_minutes": "1-2",
+      "tasks": [
+        "Analyze 5 feedback pairs",
+        "Extract rules via edit distance + semantic analysis",
+        "Synthesize 14 rules across 4 functions",
+        "Generate generated_prompt_hook.py (500+ lines)"
+      ]
+    },
+    "phase_4_finetuning_pipeline": {
+      "name": "Fine-tuning Pipeline",
+      "duration_minutes": "3-5",
+      "tasks": [
+        "Upload JSONL to OpenAI (mocked)",
+        "Create fine-tuning job (mocked)",
+        "Monitor job status via polling (mocked)",
+        "Retrieve fine-tuned model ID (mocked)",
+        "Display training metrics (mocked)"
+      ]
+    },
+    "phase_5_dashboard_summary": {
+      "name": "Dashboard & Summary",
+      "duration_minutes": 1,
+      "tasks": [
+        "Show CLI dashboard with progress bars",
+        "Display vector cluster visualization",
+        "Print fine-tuning results summary"
+      ]
+    },
+    "total_duration_minutes": "8-13"
+  },
+  "success_criteria": [
+    {
+      "id": 1,
+      "criterion": "Multiple Functions",
+      "requirement": "4 distinct @vectorize-decorated functions working in concert",
+      "status": "included"
+    },
+    {
+      "id": 2,
+      "criterion": "Volume",
+      "requirement": "60+ execution logs (15 inputs × 4 functions)",
+      "status": "included"
+    },
+    {
+      "id": 3,
+      "criterion": "Realistic Clustering",
+      "requirement": "Clear STEADY STATE (64 samples) + ANOMALY (6 samples) separation",
+      "status": "included"
+    },
+    {
+      "id": 4,
+      "criterion": "Meaningful Feedback",
+      "requirement": "15-20 feedback pairs capturing real LLM failure modes",
+      "status": "included"
+    },
+    {
+      "id": 5,
+      "criterion": "Rule Synthesis",
+      "requirement": "14+ rules extracted from feedback with measurable improvements",
+      "status": "included"
+    },
+    {
+      "id": 6,
+      "criterion": "Hook Script Generation",
+      "requirement": "Working Python script with function interception capability",
+      "status": "included"
+    },
+    {
+      "id": 7,
+      "criterion": "Fine-tuning Data",
+      "requirement": "20+ ChatML JSONL records ready for OpenAI API",
+      "status": "included"
+    },
+    {
+      "id": 8,
+      "criterion": "Cost Efficiency",
+      "requirement": "Total cost < $1 USD",
+      "status": "included"
+    },
+    {
+      "id": 9,
+      "criterion": "Real-world Relevance",
+      "requirement": "Product review domain reflects actual customer applications",
+      "status": "included"
+    },
+    {
+      "id": 10,
+      "criterion": "Comprehensive Documentation",
+      "requirement": "Specification provides all necessary implementation details",
+      "status": "included"
+    }
+  ]
+}
