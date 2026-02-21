@@ -25,3 +25,8 @@ htmlcov/
 
 *.so
 *.dylib
+
+# Node / Next.js
+node_modules/
+.next/
+out/

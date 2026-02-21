@@ -24,6 +24,10 @@ dependencies = [
 web = [
     "streamlit>=1.30.0",
 ]
+api = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-mock>=3.10.0",
