@@ -109,6 +109,22 @@ class Rule:
 
 
 # ---------------------------------------------------------------------------
+# Cost Estimation
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class CostEstimate:
+    """파인튜닝 비용 추정 결과."""
+
+    token_count: int
+    estimated_cost_usd: float
+    budget_usd: float
+    model: str
+    n_epochs: int
+    approved: bool
+
+
+# ---------------------------------------------------------------------------
 # Forward reference 해결을 위한 GoldenCandidate 재정의 방지 (SelectionStrategy 이후)
 # GoldenCandidate는 이미 위에서 SelectionStrategy를 문자열 어노테이션으로 참조하므로
 # __future__.annotations 덕분에 정상 동작한다.

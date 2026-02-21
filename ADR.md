@@ -96,3 +96,41 @@ PipelineMonitor 기반 클래스에 콜백 메서드(on_stage_start, on_progress
 - Observer Pattern으로 Pipeline 코드를 수정하지 않고 모니터링 계층 추가 가능
 - CLI/Web 대시보드를 독립적으로 개발 및 교체 가능
 - 모니터가 없어도 파이프라인은 정상 동작 (선택적 의존)
+
+---
+
+## ADR-006: tiktoken 기반 사전 비용 추정 (Cost Guard)
+
+### 상태
+채택 (Accepted)
+
+### 컨텍스트
+OpenAI Fine-tuning API는 학습 토큰 수에 비례하여 과금한다. 대규모 데이터셋을 실수로 업로드하면 예상치 못한 비용이 발생할 수 있다.
+
+### 결정
+파일 업로드(prepare_data) 전 tiktoken으로 JSONL의 토큰 수를 사전 계산하고, 모델별 단가를 적용하여 예상 비용을 산출한다. 사용자가 설정한 `max_budget_usd`를 초과하면 `BudgetExceededError`를 발생시켜 API 호출을 차단한다.
+
+### 근거
+- 비용 발생 전 차단(Shift-Left): 비싼 API 호출을 사전에 방지
+- tiktoken은 OpenAI 공식 토크나이저로 정확한 토큰 수 제공
+- 예산 파라미터가 None이면 가드레일 비활성화하여 기존 동작 유지 (하위 호환)
+- CostEstimate 데이터클래스로 투명한 비용 정보 반환
+
+---
+
+## ADR-007: 파일 기반 훅 스크립트 버전 관리
+
+### 상태
+채택 (Accepted)
+
+### 컨텍스트
+기존 HookScriptGenerator는 매 실행마다 `generated_prompt_hook.py`를 덮어쓰기한다. 잘못된 규칙이 생성되더라도 이전 버전으로 즉시 복구할 방법이 없다.
+
+### 결정
+`.hook_versions/` 디렉토리에 타임스탬프 기반 버전 파일(v001_YYYYMMDDTHHMMSSZ.py)을 저장하고, `manifest.json`으로 메타데이터를 관리한다. `HookVersionManager.rollback()`으로 특정 또는 직전 버전으로 즉시 복원 가능하다.
+
+### 근거
+- 외부 도구(Git, DB) 없이 자체적으로 버전 관리 가능
+- manifest.json으로 버전 이력을 투명하게 추적
+- 롤백 시 기존 활성 파일을 안전하게 교체 (shutil.copy2)
+- enable_versioning 플래그로 기존 코드와 하위 호환 유지

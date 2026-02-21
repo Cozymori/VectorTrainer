@@ -5,6 +5,8 @@ Covers:
   2. Synthesizer -- Levenshtein, diff analysis, rule synthesis, contradictions, hook script generation
   3. Pipeline   -- abstract trainer guard, OpenAI trainer mocking, orchestration
   4. Dashboard  -- PipelineMonitor callbacks, CLIDashboard instantiation, summary structure
+  5. Cost Guard -- token counting, cost estimation, budget validation
+  6. Hook Versioning -- version save, rollback, list, integration
 """
 
 from __future__ import annotations
@@ -23,16 +25,24 @@ import pytest
 import numpy as np
 
 from vector_trainer.types import (
+    CostEstimate,
     ExecutionLog,
     FeedbackPair,
     GoldenCandidate,
     Rule,
     SelectionStrategy,
 )
+from vector_trainer.cost_guard import (
+    BudgetExceededError,
+    check_budget,
+    count_tokens_in_jsonl,
+    estimate_training_cost,
+)
 from vector_trainer.extractor import DensityBasedExtractor
 from vector_trainer.synthesizer import (
     FeedbackDiffAnalyzer,
     HookScriptGenerator,
+    HookVersionManager,
     RuleSetSynthesizer,
     run_synthesis_pipeline,
 )
@@ -1143,3 +1153,277 @@ class TestMonitorSummary:
         assert summary["stage_results"] == {}
         assert summary["log_count"] == 0
         assert summary["total_elapsed"] >= 0.0
+
+
+# ============================================================================
+# 5. Cost Guard Tests
+# ============================================================================
+
+
+class TestCountTokensInJsonl:
+    """Tests for count_tokens_in_jsonl."""
+
+    def test_count_tokens_in_jsonl(self, tmp_path):
+        """Token count should be positive for a valid JSONL file."""
+        jsonl_file = tmp_path / "train.jsonl"
+        record = {
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Hello, world!"},
+                {"role": "assistant", "content": "Hi there!"},
+            ]
+        }
+        jsonl_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        count = count_tokens_in_jsonl(str(jsonl_file), "gpt-4o-mini-2024-07-18")
+        assert isinstance(count, int)
+        assert count > 0
+
+    def test_count_tokens_empty_file(self, tmp_path):
+        """Empty JSONL yields zero tokens."""
+        jsonl_file = tmp_path / "empty.jsonl"
+        jsonl_file.write_text("", encoding="utf-8")
+
+        count = count_tokens_in_jsonl(str(jsonl_file), "gpt-4o-mini-2024-07-18")
+        assert count == 0
+
+
+class TestEstimateTrainingCost:
+    """Tests for estimate_training_cost."""
+
+    def test_estimate_training_cost(self):
+        """Verify cost formula: tokens * epochs * price_per_token."""
+        # gpt-4o-mini: $3.00 per 1M tokens
+        cost = estimate_training_cost(1_000_000, "gpt-4o-mini-2024-07-18", n_epochs=1)
+        assert cost == pytest.approx(3.00)
+
+        # With 3 epochs
+        cost_3 = estimate_training_cost(1_000_000, "gpt-4o-mini-2024-07-18", n_epochs=3)
+        assert cost_3 == pytest.approx(9.00)
+
+    def test_estimate_unknown_model_uses_cheapest(self):
+        """Unknown model falls back to the cheapest price."""
+        cost = estimate_training_cost(1_000_000, "unknown-model-xyz", n_epochs=1)
+        # Cheapest is gpt-4o-mini at $3.00/1M
+        assert cost == pytest.approx(3.00)
+
+
+class TestCheckBudget:
+    """Tests for check_budget."""
+
+    def test_check_budget_within_limit(self, tmp_path):
+        """Budget within limit returns a CostEstimate with approved=True."""
+        jsonl_file = tmp_path / "train.jsonl"
+        record = {
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi"},
+            ]
+        }
+        jsonl_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        result = check_budget(
+            str(jsonl_file), "gpt-4o-mini-2024-07-18", max_budget_usd=100.0
+        )
+
+        assert isinstance(result, CostEstimate)
+        assert result.approved is True
+        assert result.estimated_cost_usd <= result.budget_usd
+        assert result.token_count > 0
+
+    def test_check_budget_exceeded(self, tmp_path):
+        """Budget exceeded raises BudgetExceededError."""
+        jsonl_file = tmp_path / "train.jsonl"
+        record = {
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi"},
+            ]
+        }
+        jsonl_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        with pytest.raises(BudgetExceededError) as exc_info:
+            # $0.0000001 budget -- guaranteed to exceed
+            check_budget(
+                str(jsonl_file), "gpt-4o-mini-2024-07-18", max_budget_usd=0.0000001
+            )
+
+        assert exc_info.value.estimated_cost > exc_info.value.budget
+        assert exc_info.value.token_count > 0
+
+
+class TestOpenAITrainerWithBudgetGuard:
+    """Integration test: OpenAITrainer respects max_budget_usd."""
+
+    def test_openai_trainer_with_budget_guard(self, tmp_path):
+        """prepare_data raises BudgetExceededError when budget is too low."""
+        jsonl_file = tmp_path / "training.jsonl"
+        record = {
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "What is 2+2?"},
+                {"role": "assistant", "content": "4"},
+            ]
+        }
+        jsonl_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        trainer = OpenAITrainer(api_key="sk-test-fake-key", max_budget_usd=0.0000001)
+        trainer._client = MagicMock()
+
+        with pytest.raises(BudgetExceededError):
+            trainer.prepare_data(str(jsonl_file))
+
+        # Ensure the upload was never called
+        trainer._client.files.create.assert_not_called()
+
+
+# ============================================================================
+# 6. Hook Versioning Tests
+# ============================================================================
+
+
+class TestVersionManagerSaveVersion:
+    """Tests for HookVersionManager.save_version."""
+
+    def test_version_manager_save_version(self, tmp_path):
+        """Saving a version creates a versioned file and manifest."""
+        vm = HookVersionManager(str(tmp_path))
+        vid = vm.save_version("# hook v1\n", rules_count=3)
+
+        assert vid == "v001"
+
+        # Manifest should exist
+        manifest_path = tmp_path / ".hook_versions" / "manifest.json"
+        assert manifest_path.is_file()
+
+        manifest = json.loads(manifest_path.read_text())
+        assert len(manifest["versions"]) == 1
+        assert manifest["active"] == "v001"
+
+        # Version file should exist
+        version_file = tmp_path / ".hook_versions" / manifest["versions"][0]["filename"]
+        assert version_file.is_file()
+        assert version_file.read_text() == "# hook v1\n"
+
+
+class TestVersionManagerMultipleVersions:
+    """Tests for sequential version numbering."""
+
+    def test_version_manager_multiple_versions(self, tmp_path):
+        """Multiple saves produce sequential version IDs."""
+        vm = HookVersionManager(str(tmp_path))
+
+        v1 = vm.save_version("# v1\n", rules_count=1)
+        v2 = vm.save_version("# v2\n", rules_count=2)
+        v3 = vm.save_version("# v3\n", rules_count=3)
+
+        assert v1 == "v001"
+        assert v2 == "v002"
+        assert v3 == "v003"
+
+        versions = vm.list_versions()
+        assert len(versions) == 3
+        assert versions[2]["active"] is True
+        assert versions[0]["active"] is False
+
+
+class TestVersionManagerRollback:
+    """Tests for HookVersionManager.rollback."""
+
+    def test_version_manager_rollback(self, tmp_path):
+        """Rollback restores a previous version's content to the active file."""
+        output_dir = str(tmp_path)
+        vm = HookVersionManager(output_dir)
+
+        # Generate first version via HookScriptGenerator
+        gen = HookScriptGenerator()
+        rules_v1 = [
+            Rule(rule_id="R-000", description="v1 rule", condition="always",
+                 action="No action", priority=0),
+        ]
+        gen.generate(rules_v1, output_dir)
+
+        # Generate second (different) version
+        rules_v2 = [
+            Rule(rule_id="R-000", description="v1 rule", condition="always",
+                 action="No action", priority=0),
+            Rule(rule_id="R-001", description="v2 rule", condition="always",
+                 action="No action", priority=1),
+        ]
+        gen.generate(rules_v2, output_dir)
+
+        # Active file now has v2 content
+        active_path = tmp_path / "generated_prompt_hook.py"
+        v2_content = active_path.read_text()
+        assert "R-001" in v2_content
+
+        # Rollback to v001
+        rolled = vm.rollback("v001")
+        assert rolled == "v001"
+
+        # Active file should now have v1 content (no R-001)
+        v1_content = active_path.read_text()
+        assert "R-001" not in v1_content
+        assert "R-000" in v1_content
+
+
+class TestVersionManagerListVersions:
+    """Tests for HookVersionManager.list_versions."""
+
+    def test_version_manager_list_versions(self, tmp_path):
+        """list_versions returns all versions with active flag."""
+        vm = HookVersionManager(str(tmp_path))
+
+        vm.save_version("# a\n", rules_count=1)
+        vm.save_version("# b\n", rules_count=2)
+
+        versions = vm.list_versions()
+        assert len(versions) == 2
+
+        assert versions[0]["version_id"] == "v001"
+        assert versions[0]["rules_count"] == 1
+        assert versions[0]["active"] is False
+        assert "timestamp" in versions[0]
+
+        assert versions[1]["version_id"] == "v002"
+        assert versions[1]["rules_count"] == 2
+        assert versions[1]["active"] is True
+
+
+class TestHookGeneratorWithVersioning:
+    """Integration: HookScriptGenerator stores versions when enabled."""
+
+    def test_hook_generator_with_versioning(self, tmp_path):
+        """generate() with versioning creates .hook_versions dir and entries."""
+        rules = [
+            Rule(rule_id="R-000", description="Test", condition="always",
+                 action="No action", priority=0),
+        ]
+
+        gen = HookScriptGenerator()
+        gen.generate(rules, str(tmp_path), enable_versioning=True)
+
+        # Version directory should exist
+        versions_dir = tmp_path / ".hook_versions"
+        assert versions_dir.is_dir()
+
+        vm = HookVersionManager(str(tmp_path))
+        versions = vm.list_versions()
+        assert len(versions) == 1
+        assert versions[0]["rules_count"] == 1
+
+    def test_hook_generator_without_versioning(self, tmp_path):
+        """generate() with versioning disabled skips version storage."""
+        rules = [
+            Rule(rule_id="R-000", description="Test", condition="always",
+                 action="No action", priority=0),
+        ]
+
+        gen = HookScriptGenerator()
+        gen.generate(rules, str(tmp_path), enable_versioning=False)
+
+        # No .hook_versions directory should exist
+        versions_dir = tmp_path / ".hook_versions"
+        assert not versions_dir.exists()

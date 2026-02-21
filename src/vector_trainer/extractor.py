@@ -190,7 +190,7 @@ class DensityBasedExtractor:
             log = ExecutionLog(
                 uuid=str(obj.uuid),
                 function_name=properties.get("function_name", ""),
-                return_value=properties.get("return_value", ""),
+                return_value=properties.get("return_value") or "",
                 status=properties.get("status", ""),
                 vector=vector,
                 properties=properties,
@@ -391,7 +391,7 @@ class DensityBasedExtractor:
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_content},
-                        {"role": "assistant", "content": candidate.return_value},
+                        {"role": "assistant", "content": candidate.return_value or ""},
                     ]
                 }
 

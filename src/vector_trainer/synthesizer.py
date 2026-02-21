@@ -12,8 +12,10 @@ import json
 import logging
 import math
 import os
+import shutil
 import textwrap
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .types import FeedbackPair, Rule
@@ -460,7 +462,162 @@ class RuleSetSynthesizer:
 
 
 # ---------------------------------------------------------------------------
-# Class 3: HookScriptGenerator
+# Class 3: HookVersionManager
+# ---------------------------------------------------------------------------
+
+
+class HookVersionManager:
+    """Manages versioned copies of generated hook scripts.
+
+    Each call to :meth:`save_version` stores a timestamped copy under
+    ``<output_dir>/.hook_versions/`` and updates a ``manifest.json`` that
+    tracks all versions and which one is currently active.
+
+    Directory layout::
+
+        output_dir/
+        ├── generated_prompt_hook.py       ← active version (symlink / copy)
+        └── .hook_versions/
+            ├── manifest.json
+            ├── v001_20260221T043000Z.py
+            └── v002_20260221T050000Z.py
+    """
+
+    VERSIONS_DIR = ".hook_versions"
+    MANIFEST_FILE = "manifest.json"
+
+    def __init__(self, output_dir: str) -> None:
+        self.output_dir = output_dir
+        self._versions_dir = os.path.join(output_dir, self.VERSIONS_DIR)
+        self._manifest_path = os.path.join(self._versions_dir, self.MANIFEST_FILE)
+        os.makedirs(self._versions_dir, exist_ok=True)
+
+    # -- persistence helpers -------------------------------------------------
+
+    def _load_manifest(self) -> Dict[str, Any]:
+        if os.path.isfile(self._manifest_path):
+            with open(self._manifest_path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        return {"versions": [], "active": None}
+
+    def _save_manifest(self, manifest: Dict[str, Any]) -> None:
+        with open(self._manifest_path, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, indent=2, ensure_ascii=False)
+
+    # -- public API ----------------------------------------------------------
+
+    def save_version(self, source: str, rules_count: int) -> str:
+        """Save *source* as a new version and return its version ID.
+
+        The version ID has the form ``v001``, ``v002``, etc.
+        """
+        manifest = self._load_manifest()
+        seq = len(manifest["versions"]) + 1
+        version_id = f"v{seq:03d}"
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        filename = f"{version_id}_{ts}.py"
+        filepath = os.path.join(self._versions_dir, filename)
+
+        with open(filepath, "w", encoding="utf-8") as fh:
+            fh.write(source)
+
+        entry = {
+            "version_id": version_id,
+            "filename": filename,
+            "timestamp": ts,
+            "rules_count": rules_count,
+        }
+        manifest["versions"].append(entry)
+        manifest["active"] = version_id
+        self._save_manifest(manifest)
+
+        logger.info("Saved hook version %s (%s)", version_id, filename)
+        return version_id
+
+    def rollback(self, version_id: Optional[str] = None) -> str:
+        """Restore a previous version as the active hook script.
+
+        Parameters
+        ----------
+        version_id:
+            Target version (e.g. ``"v001"``).  When *None*, rolls back to the
+            version immediately before the current active one.
+
+        Returns
+        -------
+        str
+            The version ID that is now active.
+
+        Raises
+        ------
+        ValueError
+            If the requested version does not exist or there is nothing to
+            roll back to.
+        """
+        manifest = self._load_manifest()
+        versions = manifest["versions"]
+
+        if not versions:
+            raise ValueError("No versions available for rollback.")
+
+        if version_id is None:
+            # Find the version before the current active.
+            active = manifest.get("active")
+            active_idx = None
+            for idx, v in enumerate(versions):
+                if v["version_id"] == active:
+                    active_idx = idx
+                    break
+            if active_idx is None or active_idx == 0:
+                raise ValueError("No previous version to roll back to.")
+            target = versions[active_idx - 1]
+        else:
+            target = None
+            for v in versions:
+                if v["version_id"] == version_id:
+                    target = v
+                    break
+            if target is None:
+                raise ValueError(f"Version '{version_id}' not found.")
+
+        # Copy the target version file to the active hook script location.
+        src = os.path.join(self._versions_dir, target["filename"])
+        dst = os.path.join(self.output_dir, HookScriptGenerator.SCRIPT_FILENAME)
+        shutil.copy2(src, dst)
+
+        manifest["active"] = target["version_id"]
+        self._save_manifest(manifest)
+
+        logger.info("Rolled back to %s", target["version_id"])
+        return target["version_id"]
+
+    def list_versions(self) -> List[Dict[str, Any]]:
+        """Return a list of all saved versions (oldest first)."""
+        manifest = self._load_manifest()
+        active = manifest.get("active")
+        result = []
+        for v in manifest["versions"]:
+            entry = dict(v)
+            entry["active"] = v["version_id"] == active
+            result.append(entry)
+        return result
+
+    def get_active_version(self) -> Optional[Dict[str, Any]]:
+        """Return metadata for the currently active version, or *None*."""
+        manifest = self._load_manifest()
+        active = manifest.get("active")
+        if active is None:
+            return None
+        for v in manifest["versions"]:
+            if v["version_id"] == active:
+                entry = dict(v)
+                entry["active"] = True
+                return entry
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Class 4: HookScriptGenerator
 # ---------------------------------------------------------------------------
 
 
@@ -475,8 +632,23 @@ class HookScriptGenerator:
 
     # -- public API ----------------------------------------------------------
 
-    def generate(self, rules: List[Rule], output_dir: str) -> str:
+    def generate(
+        self,
+        rules: List[Rule],
+        output_dir: str,
+        enable_versioning: bool = True,
+    ) -> str:
         """Generate the hook script file and return its absolute path.
+
+        Parameters
+        ----------
+        rules:
+            List of :class:`Rule` objects to embed in the script.
+        output_dir:
+            Directory where the script (and version history) will be written.
+        enable_versioning:
+            When *True* (the default) each generation is saved as a numbered
+            version under ``<output_dir>/.hook_versions/``.
 
         Raises
         ------
@@ -493,6 +665,10 @@ class HookScriptGenerator:
             raise SyntaxError(
                 "Generated hook script contains invalid Python syntax."
             )
+
+        if enable_versioning:
+            vm = HookVersionManager(output_dir)
+            vm.save_version(source, len(rules))
 
         file_path = os.path.join(output_dir, self.SCRIPT_FILENAME)
         with open(file_path, "w", encoding="utf-8") as fh:

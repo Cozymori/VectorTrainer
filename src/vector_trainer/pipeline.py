@@ -125,9 +125,11 @@ class OpenAITrainer(BaseTrainer):
         self,
         api_key: Optional[str] = None,
         model: str = "gpt-4o-mini-2024-07-18",
+        max_budget_usd: Optional[float] = None,
     ) -> None:
         self._api_key: Optional[str] = api_key
         self.model: str = model
+        self.max_budget_usd: Optional[float] = max_budget_usd
         self._client: Optional[OpenAI] = None
 
     # -- lazy client ----------------------------------------------------------
@@ -154,12 +156,28 @@ class OpenAITrainer(BaseTrainer):
     def prepare_data(self, jsonl_path: str) -> str:
         """Upload a JSONL training file to OpenAI.
 
+        When :attr:`max_budget_usd` is set, the estimated training cost is
+        checked **before** uploading.  If the cost exceeds the budget a
+        :class:`~vector_trainer.cost_guard.BudgetExceededError` is raised
+        and no API call is made.
+
         Returns the OpenAI file ID (e.g. ``file-abc123``).
         """
 
         path = Path(jsonl_path)
         if not path.is_file():
             raise FileNotFoundError(f"Training file not found: {jsonl_path}")
+
+        if self.max_budget_usd is not None:
+            from .cost_guard import check_budget
+
+            cost_info = check_budget(jsonl_path, self.model, self.max_budget_usd)
+            logger.info(
+                "Cost estimate: %d tokens, $%.4f (budget: $%.2f)",
+                cost_info.token_count,
+                cost_info.estimated_cost_usd,
+                cost_info.budget_usd,
+            )
 
         logger.info("Uploading training data: %s", jsonl_path)
         with open(jsonl_path, "rb") as fh:
