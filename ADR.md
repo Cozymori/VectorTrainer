@@ -78,3 +78,21 @@ Golden Data 선별을 위해 로그 데이터의 분포를 분석해야 한다. 
 - OCP(Open-Closed Principle): 새 벤더 추가 시 기존 코드 수정 불필요
 - 테스트에서 Mock Trainer 주입 가능
 - 파인튜닝 벤더 전환 시 Pipeline 코드 변경 없음
+
+---
+
+## ADR-005: 콜백 기반 모니터링 (Observer Pattern)
+
+### 상태
+채택 (Accepted)
+
+### 컨텍스트
+파인튜닝 파이프라인의 진행 과정을 실시간으로 시각화해야 하며, CLI와 웹 두 가지 인터페이스를 모두 지원해야 한다.
+
+### 결정
+PipelineMonitor 기반 클래스에 콜백 메서드(on_stage_start, on_progress, on_stage_complete)를 정의하고, CLIDashboard(rich)와 WebDashboard(Streamlit)가 이를 상속받아 구현한다. TrainingPipeline은 monitor 인스턴스를 선택적으로 주입받아 호출한다.
+
+### 근거
+- Observer Pattern으로 Pipeline 코드를 수정하지 않고 모니터링 계층 추가 가능
+- CLI/Web 대시보드를 독립적으로 개발 및 교체 가능
+- 모니터가 없어도 파이프라인은 정상 동작 (선택적 의존)
