@@ -334,7 +334,7 @@ class TrainingPipeline:
         extraction_result = self.extractor.extract_golden_data(
             function_name, jsonl_path
         )
-        self._notify_complete(stage, extraction_result)
+        self._notify_complete(stage, {"jsonl_path": extraction_result})
 
         # -- Stage 2: Synthesize hook script ---------------------------------
         stage = "synthesize"
@@ -342,19 +342,19 @@ class TrainingPipeline:
         synthesis_result = run_synthesis_pipeline(
             feedback_pairs, self.synthesizer_output_dir
         )
-        self._notify_complete(stage, synthesis_result)
+        self._notify_complete(stage, {"hook_script": synthesis_result})
 
         # -- Stage 3: Prepare (upload) training data -------------------------
         stage = "prepare"
         self._notify_start(stage)
         file_id: str = self.trainer.prepare_data(jsonl_path)
-        self._notify_complete(stage, file_id)
+        self._notify_complete(stage, {"file_id": file_id})
 
         # -- Stage 4: Start training -----------------------------------------
         stage = "train"
         self._notify_start(stage)
         job_id: str = self.trainer.start_training(file_id)
-        self._notify_complete(stage, job_id)
+        self._notify_complete(stage, {"job_id": job_id})
 
         # -- Summary ---------------------------------------------------------
         summary: Dict[str, Any] = {

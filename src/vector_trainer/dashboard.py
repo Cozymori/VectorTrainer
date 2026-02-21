@@ -95,11 +95,12 @@ class PipelineMonitor:
         """Called to report incremental progress within a stage."""
         logger.debug("Progress [%s]: %d / %d", stage, current, total)
 
-    def on_stage_complete(self, stage_name: str, result: Dict[str, Any]) -> None:
+    def on_stage_complete(self, stage_name: str, result: Any) -> None:
         """Called when a pipeline stage finishes successfully."""
+        if not isinstance(result, dict):
+            result = {"result": result}
         self.stage_results[stage_name] = result
         elapsed = time.time() - self._stage_start_times.get(stage_name, self.start_time)
-        self.stage_results.setdefault(stage_name, {})
         self.stage_results[stage_name]["_elapsed"] = elapsed
         if self.current_stage == stage_name:
             self.current_stage = None
@@ -204,7 +205,7 @@ class CLIDashboard(PipelineMonitor):
             task_id = self._task_ids[stage]
             self._progress.update(task_id, completed=current, total=total)
 
-    def on_stage_complete(self, stage_name: str, result: Dict[str, Any]) -> None:
+    def on_stage_complete(self, stage_name: str, result: Any) -> None:
         super().on_stage_complete(stage_name, result)
 
         # Finish associated progress bar if present
@@ -216,7 +217,8 @@ class CLIDashboard(PipelineMonitor):
 
         # Build a compact result string for display
         display_items: List[str] = []
-        for key, value in result.items():
+        stored = self.stage_results.get(stage_name, {})
+        for key, value in stored.items():
             if key.startswith("_"):
                 continue
             display_items.append(f"[bold]{key}[/bold]={value}")
